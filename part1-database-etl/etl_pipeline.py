@@ -50,7 +50,6 @@ def main():
     customers = pd.read_csv("../data/customers_raw.csv")
     customers = customers.drop_duplicates()
     customers = customers[customers["email"].notna()]
-
     customers["phone"] = customers["phone"].apply(normalize_phone)
     customers["registration_date"] = customers["registration_date"].apply(parse_date)
 
@@ -71,34 +70,21 @@ def main():
                 row["registration_date"]
             ))
         except mysql.connector.Error:
-            pass  # Ignore duplicates on rerun
+            pass
 
     conn.commit()
-    logging.info(f"Customers loaded: {len(customers)}")
 
     # ---------------- PRODUCTS ----------------
     products = pd.read_csv("../data/products_raw.csv")
-    raw_products = len(products)
-
-    # Remove products with missing price
     products = products[products["price"].notna()]
-
-    # Fill missing stock with 0
     products["stock_quantity"] = products["stock_quantity"].fillna(0)
-
-    # Normalize category names
     products["category"] = products["category"].apply(normalize_category)
-
-    logging.info(f"Products raw: {raw_products}")
-    logging.info(f"Products cleaned: {len(products)}")
 
     product_insert = """
         INSERT INTO products
         (product_name, category, price, stock_quantity)
         VALUES (%s, %s, %s, %s)
     """
-
-    inserted_products = 0
 
     for _, row in products.iterrows():
         try:
@@ -108,16 +94,80 @@ def main():
                 row["price"],
                 int(row["stock_quantity"])
             ))
-            inserted_products += 1
-        except mysql.connector.Error as e:
-            logging.warning(f"Skipping product: {e}")
+        except mysql.connector.Error:
+            pass
 
     conn.commit()
-    logging.info(f"Products successfully loaded: {inserted_products}")
+
+    # ---------------- SALES ----------------
+    sales = pd.read_csv("../data/sales_raw.csv")
+    raw_sales = len(sales)
+
+    # Remove duplicates
+    sales = sales.drop_duplicates(subset=["transaction_id"])
+
+    # Remove missing customer_id or product_id
+    sales = sales[sales["customer_id"].notna() & sales["product_id"].notna()]
+
+    # Normalize date
+    sales["transaction_date"] = sales["transaction_date"].apply(parse_date)
+
+    logging.info(f"Sales raw: {raw_sales}")
+    logging.info(f"Sales cleaned: {len(sales)}")
+
+    order_insert = """
+        INSERT INTO orders (customer_id, order_date, total_amount, status)
+        VALUES (%s, %s, %s, %s)
+    """
+
+    order_item_insert = """
+        INSERT INTO order_items
+        (order_id, product_id, quantity, unit_price, subtotal)
+        VALUES (%s, %s, %s, %s, %s)
+    """
+
+    inserted_orders = 0
+
+    for _, row in sales.iterrows():
+        try:
+            customer_id = int(row["customer_id"][1:])
+            product_id = int(row["product_id"][1:])
+            quantity = int(row["quantity"])
+            unit_price = float(row["unit_price"])
+            subtotal = quantity * unit_price
+
+            # Insert order
+            cursor.execute(order_insert, (
+                customer_id,
+                row["transaction_date"],
+                subtotal,
+                row["status"]
+            ))
+
+            order_id = cursor.lastrowid
+
+            # Insert order item
+            cursor.execute(order_item_insert, (
+                order_id,
+                product_id,
+                quantity,
+                unit_price,
+                subtotal
+            ))
+
+            inserted_orders += 1
+
+        except Exception as e:
+            logging.warning(f"Skipping sale due to error: {e}")
+
+    conn.commit()
+
+    logging.info(f"Orders successfully loaded: {inserted_orders}")
 
     cursor.close()
     conn.close()
-    logging.info("Product ETL completed successfully")
+
+    logging.info("ETL pipeline COMPLETED successfully")
 
 if __name__ == "__main__":
     main()
