@@ -1,0 +1,55 @@
+FlexiMart ETL Data Quality Report
+--------------------------------
+Execution Date: 08/01/2026
+
+CUSTOMERS DATA
+--------------
+Raw records processed: 26
+Duplicate records removed: 1
+Records with missing email removed: 5
+Clean records loaded into database: 20
+
+Data Cleaning Actions:
+- Removed duplicate customer entries
+- Removed records with missing mandatory email field
+- Standardized phone numbers to +91-XXXXXXXXXX format
+- Normalized registration dates to YYYY-MM-DD format
+
+
+PRODUCTS DATA
+-------------
+Raw records processed: 20
+Records with missing price removed: 3
+Records with missing stock filled with default value (0): 1
+Clean records loaded into database: 17
+
+Data Cleaning Actions:
+- Removed products with missing price
+- Standardized category names (Electronics, Fashion, Groceries)
+- Filled null stock quantities with default value 0
+- Trimmed extra spaces from product names
+
+
+SALES DATA
+----------
+Raw records processed: 41
+Duplicate transactions removed: 1
+Records with missing customer_id or product_id removed: 5
+Records skipped due to foreign key violations: 1
+Clean records loaded into database: 34
+
+Data Cleaning Actions:
+- Removed duplicate transaction records
+- Removed sales with missing customer or product references
+- Standardized transaction date formats
+- Enforced referential integrity using foreign keys
+
+
+ETL SUMMARY
+-----------
+Total customers loaded: 20
+Total products loaded: 17
+Total orders loaded: 34
+Total order items loaded: 34
+
+ETL Status: SUCCESSFUL
